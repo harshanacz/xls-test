@@ -1,0 +1,8 @@
+{
+  "xmlLanguageServer.schemas": [
+    {
+      "pattern": "config.xml",
+      "xsdPath": "my-schema.xsd"
+    }
+  ]
+}
