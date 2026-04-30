@@ -1,22 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="http://ws.apache.org/ns/synapse">
-    <api name="TestAPI" context="/test">
-        <resource methods="GET" uri-template="/hello">
-            <inSequence>
-                <log level="full"/>
-                
-                <!-- Create JSON response -->
-                <payloadFactory media-type="json">
-                    <format>{"message": "Hello from WSO2 MI"}</format>
-                    <args/>
-                </payloadFactory>
-                
-                <!-- Send response back to client -->
-                <respond/>
-            </inSequence>
-            
-            <outSequence/>
-            <faultSequence/>
-        </resource>
-    </api>
-</definitions>
+<api xmlns="http://ws.apache.org/ns/synapse" name="MultiplyAPI" context="/multiply">
+    <resource methods="POST" uri-template="/">
+        <inSequence>
+            <variable name="result" expression="${payload.number * 2}" type="INTEGER"/>
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "input": ${payload.number},
+                        "result": ${vars.result}
+                    }
+                </format>
+            </payloadFactory>
+            <respond/>
+        </inSequence>
+        <faultSequence>
+            <log category="ERROR">
+                <message>Error occurred: ${props.synapse.ERROR_MESSAGE}</message>
+            </log>
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "error": "Invalid input. Please provide a valid number."
+                    }
+                </format>
+            </payloadFactory>
+            <respond/>
+        </faultSequence>
+    </resource>
+</api>
