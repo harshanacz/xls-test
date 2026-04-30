@@ -1,12 +1,12 @@
 {
   "xmlLanguageServer.schemas": [
-    {
-      "pattern": "wso2-430-project/**/*.xml",
-      "xsdPath": "schemas/430/synapse_config.xsd"
-    },
-    {
-      "pattern": "wso2-440-project/**/*.xml",
-      "xsdPath": "schemas/440/synapse_config.xsd"
-    }
-  ]
+  {
+    "pattern": "wso2-430-project/**/*.xml",
+    "xsdPath": "schemas/430/synapse_config.xsd"
+  },
+  {
+    "pattern": "wso2-440-project/**/*.xml",
+    "xsdPath": "schemas/440/synapse_config.xsd"
+  }
+]
 }
