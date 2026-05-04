@@ -2,39 +2,39 @@
 <api xmlns="http://ws.apache.org/ns/synapse" name="MultiplyAPI" context="/multiply">
     <resource methods="POST" uri-template="/">
         <inSequence>
-            
-            <!-- Use property instead of variable (works in 4.3.0) -->
-            <property name="result" 
-                      expression="$ctx:payload.number * 2" 
-                      type="INTEGER" 
-                      scope="default"/>
 
-            <payloadFactory media-type="json">
-                <format>
-                    {
+            <!-- Use property instead of variable (works in 4.3.0) -->
+            <property name="result"
+                expression="$ctx:payload.number * 2"
+                type="INTEGER"
+                scope="default"/>
+
+                <payloadFactory media-type="json">
+                    <format>
+                        {
                         "input": $ctx:payload.number,
                         "result": $ctx:result
-                    }
-                </format>
-                <args/>        <!-- keep this to remove previous warning -->
-            </payloadFactory>
+                        }
+                    </format>
+                    <args/>        <!-- keep this to remove previous warning -->
+                    </payloadFactory>
 
-            <respond/>
-        </inSequence>
+                    <respond/>
+                </inSequence>
 
-        <faultSequence>
-            <log level="custom" category="ERROR">
-                <property name="ERROR_MESSAGE" expression="$ctx:ERROR_MESSAGE"/>
-            </log>
-            <payloadFactory media-type="json">
-                <format>
-                    {
-                        "error": "Invalid input. Please provide a valid number."
-                    }
-                </format>
-                <args/>
-            </payloadFactory>
-            <respond/>
-        </faultSequence>
-    </resource>
-</api>
+                <faultSequence>
+                    <log level="custom" category="ERROR">
+                        <property name="ERROR_MESSAGE" expression="$ctx:ERROR_MESSAGE"/>
+                    </log>
+                    <payloadFactory media-type="json">
+                        <format>
+                            {
+                            "error": "Invalid input. Please provide a valid number."
+                            }
+                        </format>
+                        <args/>
+                    </payloadFactory>
+                    <respond/>
+                </faultSequence>
+            </resource>
+        </api>
