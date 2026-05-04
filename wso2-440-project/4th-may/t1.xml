@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<api name="TestVerificationAPI" context="/verify" xmlns="http://ws.apache.org/ns/synapse">
+    <resource methods="POST" uri-template="/check" protocol="https">
+        <inSequence>
+            <!-- 1. Check Log Mediator -->
+            <log level="full" category="INFO" separator=" | " logMessageID="true" logFullPayload="true">
+                <message>Starting verification flow...</message>
+                <property name="RequestReceived" value="true"/>
+            </log>
+
+            <!-- 2. Check Property Mediator -->
+            <property name="internal_id" value="12345" scope="synapse" type="STRING" description="Internal tracking ID"/>
+
+            <!-- 3. Check Variable Mediator (MI 4.4.0) -->
+            <variable name="user_status" value="active" type="STRING" action="set" description="Current user state"/>
+
+            <!-- 4. Check PayloadFactory Mediator -->
+            <payloadFactory media-type="json" template-type="default" description="Transforming request">
+                <format>{"status": "$1", "id": "$2"}</format>
+                <args>
+                    <arg expression="var:user_status"/>
+                    <arg expression="$ctx:internal_id"/>
+                </args>
+            </payloadFactory>
+
+            <!-- 5. Check Call Mediator with inline Endpoint -->
+            <call blocking="true" description="Calling backend service">
+                <endpoint name="BackendEndpoint">
+                    <address uri="http://localhost:8080/service" format="rest">
+                        <timeout>
+                            <duration>30000</duration>
+                            <responseAction>fault</responseAction>
+                        </timeout>
+                    </address>
+                </endpoint>
+            </call>
+
+            <!-- 6. Check Respond Mediator -->
+            <respond description="Returning final response to client"/>
+        </inSequence>
+        <faultSequence>
+            <log level="custom" category="ERROR">
+                <property name="error" value="An error occurred during verification"/>
+            </log>
+        </faultSequence>
+    </resource>
+</api>

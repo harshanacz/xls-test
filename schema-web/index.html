@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Synapse Schema Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent-color: #38bdf8;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color); color: var(--text-primary);
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+            background-image: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%);
+        }
+
+        .container { width: 90%; max-width: 900px; margin-top: 40px; text-align: center; }
+        h1 { font-weight: 600; font-size: 2.2rem; margin-bottom: 10px; background: linear-gradient(to right, #fff, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .controls { display: flex; gap: 10px; margin-bottom: 30px; justify-content: center; }
+        
+        select, input {
+            padding: 12px 20px; font-size: 1rem; border-radius: 8px; border: 1px solid var(--border-color);
+            background: var(--card-bg); color: white; outline: none; backdrop-filter: blur(10px);
+        }
+        
+        select { cursor: pointer; }
+        input { flex-grow: 1; max-width: 400px; }
+
+        .result-card {
+            background: var(--card-bg); border-radius: 16px; padding: 32px; text-align: left;
+            border: 1px solid var(--border-color); backdrop-filter: blur(12px);
+            animation: fadeIn 0.4s ease-out; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 40px;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .element-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .element-tag { background: rgba(56, 189, 248, 0.2); color: var(--accent-color); padding: 4px 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 1.2rem; }
+        .source-file { font-size: 0.8rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+        .description { line-height: 1.6; color: var(--text-secondary); margin-bottom: 30px; font-size: 1rem; white-space: pre-wrap; }
+        .section-title { font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-color); margin-bottom: 12px; display: block; }
+        
+        .attr-list, .child-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 30px; }
+        .item { background: rgba(255, 255, 255, 0.03); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 4px; }
+        .item-name { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #fff; }
+        .item-meta { font-size: 0.7rem; color: #64748b; }
+        .required { color: #ef4444; font-weight: 600; font-size: 0.65rem; margin-left: 5px; }
+        
+        .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--accent-color); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: none; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Schema Explorer</h1>
+        <div class="controls">
+            <select id="versionSelect">
+                <option value="440">MI 4.4.0</option>
+                <option value="430">MI 4.3.0</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="Search element (e.g. log, variable, api)..." autocomplete="off">
+        </div>
+
+        <div id="loader" class="loader"></div>
+
+        <div id="resultCard" class="result-card" style="display: none;">
+            <div class="element-header">
+                <span class="element-tag" id="elName"></span>
+                <span class="source-file" id="elSource"></span>
+            </div>
+            <div class="description" id="elDesc"></div>
+
+            <span class="section-title">Attributes</span>
+            <div class="attr-list" id="elAttrs"></div>
+
+            <span class="section-title">Child Elements</span>
+            <div class="child-list" id="elChildren"></div>
+        </div>
+        
+        <div id="statusMsg" class="empty-state">Enter an element name to parse the XSD dynamically.</div>
+    </div>
+
+    <script>
+        const parser = new DOMParser();
+        const cache = { schemas: {}, attributeGroups: {}, complexTypes: {} };
+        
+        async function fetchSchema(path) {
+            if (cache.schemas[path]) return cache.schemas[path];
+            try {
+                const response = await fetch(path);
+                if (!response.ok) throw new Error(`Failed to load ${path}`);
+                const text = await response.text();
+                const doc = parser.parseFromString(text, "text/xml");
+                cache.schemas[path] = doc;
+                return doc;
+            } catch (e) {
+                console.error(e);
+                return null;
+            }
+        }
+
+        async function resolveAttributeGroup(groupName, basePath, version) {
+            const groupKey = `${version}:${groupName}`;
+            if (cache.attributeGroups[groupKey]) return cache.attributeGroups[groupKey];
+
+            // Common places for attribute groups
+            const commonPaths = [
+                `../schemas/${version}/misc/common.xsd`,
+                `../schemas/${version}/api.xsd`
+            ];
+
+            for (const path of commonPaths) {
+                const doc = await fetchSchema(path);
+                if (!doc) continue;
+                const group = doc.querySelector(`attributeGroup[name="${groupName}"]`);
+                if (group) {
+                    const attrs = await parseAttributes(group, path, version);
+                    cache.attributeGroups[groupKey] = attrs;
+                    return attrs;
+                }
+            }
+            return [];
+        }
+
+        async function parseAttributes(node, currentPath, version) {
+            let attrs = [];
+            
+            // Direct attributes
+            const directAttrs = node.querySelectorAll(':scope > attribute');
+            directAttrs.forEach(attr => {
+                attrs.push({
+                    name: attr.getAttribute('name'),
+                    type: attr.getAttribute('type') || 'xs:string',
+                    required: attr.getAttribute('use') === 'required'
+                });
+            });
+
+            // Attribute groups
+            const groups = node.querySelectorAll(':scope > attributeGroup');
+            for (const group of groups) {
+                const ref = group.getAttribute('ref');
+                if (ref) {
+                    const resolved = await resolveAttributeGroup(ref, currentPath, version);
+                    attrs = attrs.concat(resolved);
+                }
+            }
+
+            return attrs;
+        }
+
+        async function findElementInSchema(elName, version) {
+            const searchPaths = [
+                { path: `../schemas/${version}/mediators/mediators.xsd`, dir: `../schemas/${version}/mediators/` },
+                { path: `../schemas/${version}/api.xsd`, dir: `../schemas/${version}/` }
+            ];
+
+            for (const entry of searchPaths) {
+                const doc = await fetchSchema(entry.path);
+                if (!doc) continue;
+
+                // 1. Look for direct element definition
+                let el = doc.querySelector(`element[name="${elName}"]`);
+                
+                // 2. Look for element ref in mediatorList
+                if (!el) {
+                    const ref = doc.querySelector(`element[ref="${elName}"]`);
+                    if (ref) {
+                        // Find where this ref is defined (it's usually in an included file)
+                        const includes = doc.querySelectorAll('include');
+                        for (const inc of includes) {
+                            const incPath = entry.dir + inc.getAttribute('schemaLocation');
+                            const incDoc = await fetchSchema(incPath);
+                            el = incDoc?.querySelector(`element[name="${elName}"]`);
+                            if (el) return { el, path: incPath };
+                        }
+                    }
+                } else {
+                    return { el, path: entry.path };
+                }
+            }
+            return null;
+        }
+
+        async function search() {
+            const query = document.getElementById('searchInput').value.trim();
+            const version = document.getElementById('versionSelect').value;
+            const resultCard = document.getElementById('resultCard');
+            const statusMsg = document.getElementById('statusMsg');
+            const loader = document.getElementById('loader');
+
+            if (!query) {
+                resultCard.style.display = "none";
+                statusMsg.style.display = "block";
+                return;
+            }
+
+            loader.style.display = "block";
+            resultCard.style.display = "none";
+            statusMsg.style.display = "none";
+
+            const result = await findElementInSchema(query, version);
+
+            if (result) {
+                const { el, path } = result;
+                const complexType = el.querySelector('complexType') || 
+                                   (el.getAttribute('type') ? await findComplexType(el.getAttribute('type'), path, version) : null);
+
+                document.getElementById('elName').textContent = `<${query}>`;
+                document.getElementById('elSource').textContent = path.split('/').pop();
+                
+                const docNode = el.querySelector('documentation');
+                document.getElementById('elDesc').textContent = docNode ? docNode.textContent.trim() : "No description found in XSD.";
+
+                if (complexType) {
+                    const attrs = await parseAttributes(complexType, path, version);
+                    document.getElementById('elAttrs').innerHTML = attrs.map(a => `
+                        <div class="item">
+                            <span class="item-name">${a.name}${a.required ? '<span class="required">REQUIRED</span>' : ''}</span>
+                            <span class="item-meta">${a.type}</span>
+                        </div>
+                    `).join('');
+
+                    const children = [];
+                    complexType.querySelectorAll('element').forEach(child => {
+                        const name = child.getAttribute('name') || child.getAttribute('ref');
+                        if (name && !children.includes(name)) children.push(name);
+                    });
+                    
+                    document.getElementById('elChildren').innerHTML = children.length > 0
+                        ? children.map(c => `<div class="item"><span class="item-name">&lt;${c}&gt;</span></div>`).join('')
+                        : '<span class="empty-state">None</span>';
+                }
+
+                resultCard.style.display = "block";
+                loader.style.display = "none";
+            } else {
+                loader.style.display = "none";
+                statusMsg.textContent = "Element not found in schemas.";
+                statusMsg.style.display = "block";
+            }
+        }
+
+        async function findComplexType(typeName, basePath, version) {
+            // Logic to find named complexType across files
+            const doc = await fetchSchema(basePath);
+            return doc?.querySelector(`complexType[name="${typeName}"]`);
+        }
+
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
+        });
+    </script>
+</body>
+</html>
