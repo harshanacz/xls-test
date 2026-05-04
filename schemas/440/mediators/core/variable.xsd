@@ -24,7 +24,7 @@
     <xs:element name="variable">
         <xs:annotation>
             <xs:documentation source="description">
-                Set or remove a variable to/from the message.
+                Set or remove a typed variable (e.g., STRING, JSON, XML) to/from the message context.
             </xs:documentation>
         </xs:annotation>
         <xs:complexType>

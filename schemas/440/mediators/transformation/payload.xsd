@@ -24,7 +24,7 @@
     <xs:element name="payloadFactory">
         <xs:annotation>
             <xs:documentation source="description">
-                Replaces the existing message payload with a new SOAP or JSON payload.
+                Replaces the existing message payload with a new SOAP, JSON, or Text payload defined in a format tag.
             </xs:documentation>
         </xs:annotation>
         <xs:complexType>

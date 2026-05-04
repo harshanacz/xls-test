@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://ws.apache.org/ns/synapse">
+
+    <!-- REST API - Most Important -->
+    <api name="OrderAPI" context="/orders" version="1.0">
+        <resource methods="GET POST PUT DELETE" uri-template="/*">
+            <inSequence>
+                <log level="custom">
+                    <property name="Message" value="Order API called"/>
+                </log>
+
+                <!-- Property -->
+                <property name="HTTP_SC" value="200" scope="axis2"/>
+
+                <!-- PayloadFactory -->
+                <payloadFactory media-type="json">
+                    <format>{"status":"success", "message":"$1", "timestamp":"$2"}</format>
+                    <args>
+                        <arg evaluator="xml" expression="$ctx:msg"/>
+                        <arg evaluator="xml" expression="get-property('SYSTEM_DATE')"/>
+                    </args>
+                </payloadFactory>
+
+                <!-- Filter -->
+                <filter source="$ctx:HTTP_METHOD" regex="POST">
+                    <then>
+                        <enrich>
+                            <source type="inline">
+                                <extra>processed</extra>
+                            </source>
+                            <target type="body"/>
+                        </enrich>
+                    </then>
+                </filter>
+
+                <!-- Send to backend -->
+                <send>
+                    <endpoint>
+                        <http method="GET" uri-template="http://backend:8080/api/orders"/>
+                    </endpoint>
+                </send>
+            </inSequence>
+
+            <outSequence>
+                <respond/>
+            </outSequence>
+
+            <faultSequence>
+                <log level="full"/>
+                <property name="HTTP_SC" value="500" scope="axis2"/>
+                <respond/>
+            </faultSequence>
+        </resource>
+    </api>
+
+    <!-- Reusable Sequence -->
+    <sequence name="CommonErrorHandler">
+        <log level="custom">
+            <property name="ERROR" expression="$ctx:ERROR_MESSAGE"/>
+        </log>
+        <respond/>
+    </sequence>
+
+</definitions>

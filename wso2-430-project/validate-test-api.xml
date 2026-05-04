@@ -1,0 +1,11 @@
+<api name="OldVersionAPI" context="/v1" xmlns="http://ws.apache.org/ns/synapse">
+    <resource methods="GET">
+        <inSequence>
+            <payloadFactory media-type="json">
+                <format>{"status": "Legacy support"}</format>
+                <args/> <!-- Required in 4.3.0 schema -->
+            </payloadFactory>
+            <respond/>
+        </inSequence>
+    </resource>
+</api>
